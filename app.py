@@ -31,8 +31,8 @@ st.markdown("""
 
 # --- CONFIGURATION ---
 # PASTE YOUR API KEY BELOW
-GOOG_API_KEY = "AIzaSyA7O2L0lvNkrIHPFj4_vRABCnhcOhUqPbM" 
-
+# Fetch the key securely from Streamlit Secrets
+GOOG_API_KEY = st.secrets["GOOG_API_KEY"]
 try:
     genai.configure(api_key=GOOG_API_KEY)
 except Exception as e:
