@@ -127,8 +127,8 @@ def get_ai_master_analysis(ticker, daily, micro):
     
     prompt = f"""
     Act as a Hedge Fund Manager. Ticker: {ticker}
-    1. MACRO (Daily Chart): Trend: {daily['Trend']}, Score: {daily['Score']}/4
-    2. MICRO (5m Chart): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
+    1. MACRO (Daily): Trend: {daily['Trend']}, Score: {daily['Score']}/4
+    2. MICRO (5m): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
     3. NEWS: {str(headlines)}
     
     YOUR TASK:
@@ -140,8 +140,10 @@ def get_ai_master_analysis(ticker, daily, micro):
     for _ in range(3):
         try:
             return model.generate_content(prompt).text
-        except: time.sleep(1)
-    return "⚠️ AI Busy. Try refreshing."
+        except Exception as e:
+            time.sleep(1)
+            last_error = str(e)
+    return f"⚠️ AI Connection Failed: {last_error}"
 
 # --- UI LAYOUT ---
 # Header
