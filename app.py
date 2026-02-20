@@ -344,43 +344,55 @@ if mode == "Single Ticker":
 
 # --- MODE 2: INSTITUTIONAL SCANNER ---
 elif mode == "Market Scanner":
-    st.subheader("📡 Institutional Liquidity Screener")
-    st.caption("Screen highly-liquid, institutional-grade assets using direct exchange data.")
+    st.subheader("📡 AI Sector Discovery & Screener")
+    st.caption("Use AI to discover market themes, then quant-filter for actionable setups.")
     
-    # --- INSTITUTIONAL LIQUIDITY UNIVERSE ---
-    # Real day traders don't scan 500 random stocks. They scan where the volume is.
-    def get_institutional_universe(category):
-        universes = {
-            "NYSE/NASDAQ Mega-Caps (High Volume)": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "LLY", "JPM"],
-            "High-Beta Semiconductors": ["NVDA", "AMD", "TSM", "SMCI", "ASML", "MU", "ARM", "QCOM", "TXN", "INTC"],
-            "Wall Street Financials & Banks": ["JPM", "GS", "MS", "BAC", "C", "WFC", "BLK", "BX", "V", "MA"],
-            "Crypto Proxy & Blockchain": ["MSTR", "COIN", "MARA", "RIOT", "CLSK", "HOOD", "IBIT"]
-        }
-        return universes.get(category, universes["NYSE/NASDAQ Mega-Caps (High Volume)"])
+    # --- HELPER: AI DISCOVERY ENGINE ---
+    def get_ai_ticker_universe(theme):
+        try:
+            model = genai.GenerativeModel('gemini-2.5-flash')
+            prompt = f"You are a hedge fund analyst. Provide exactly 15 US stock tickers related to this theme: '{theme}'. ONLY return the tickers separated by commas. Do not say 'Here are the tickers' or any other words. Example format: AAPL, MSFT, GOOGL"
+            response = model.generate_content(prompt)
+            # Clean the text and split into a list
+            raw_text = response.text.replace('\n', '').replace(' ', '')
+            tickers = [t.upper() for t in raw_text.split(',') if t.isalpha()]
+            return tickers[:15] # Cap at 15 for API speed
+        except: return ["QQQ", "SPY"] # Fallback
 
-    # 1. Premium Screener Controls
-    st.markdown("### 🎛️ Screener Parameters")
+    # 1. Premium AI Screener Controls
+    st.markdown("### 🎛️ AI Discovery Engine")
+    
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        universe_choice = st.selectbox("Liquidity Universe", [
-            "NYSE/NASDAQ Mega-Caps (High Volume)", 
-            "High-Beta Semiconductors", 
-            "Wall Street Financials & Banks",
-            "Crypto Proxy & Blockchain",
-            "Custom List"
-        ])
+        search_type = st.radio("Search Method", ["AI Custom Theme", "Pre-Built Liquidity Lists"], horizontal=True)
+        
+        if search_type == "AI Custom Theme":
+            user_theme = st.text_input("Ask the AI to build a sector (e.g., 'Robotics', 'Cybersecurity', 'Lithium')", "Next generation AI hardware")
+        else:
+            universe_choice = st.selectbox("Liquidity Universe", [
+                "Mega-Caps (High Volume)", 
+                "High-Beta Semiconductors", 
+                "Wall Street Financials & Banks"
+            ])
+            
     with col2:
-        min_score = st.selectbox("Minimum Tech Score", [0, 1, 2, 3, 4], index=3)
+        min_score = st.selectbox("Minimum Tech Score", [0, 1, 2, 3, 4], index=2)
     with col3:
         require_vwap = st.checkbox("Require Intraday VWAP 'BUY'")
-        
-    if universe_choice == "Custom List":
-        custom_input = st.text_input("Enter tickers (comma separated)", "SPY, QQQ, IWM, DIA")
-        scan_list = [t.strip().upper() for t in custom_input.split(",")]
-    else:
-        scan_list = get_institutional_universe(universe_choice)
 
-    if st.button("🚀 Run Algorithmic Screen", use_container_width=True):
+    if st.button("🚀 Run AI Discovery & Quant Screen", use_container_width=True):
+        
+        # Step 1: Build the list
+        with st.spinner("🤖 AI is building your custom ticker universe..."):
+            if search_type == "AI Custom Theme":
+                scan_list = get_ai_ticker_universe(user_theme)
+                st.info(f"**AI Generated Universe:** {', '.join(scan_list)}")
+            else:
+                if "Mega" in universe_choice: scan_list = ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA"]
+                elif "Semi" in universe_choice: scan_list = ["AMD", "TSM", "AVGO", "QCOM", "INTC", "ASML", "MU"]
+                else: scan_list = ["JPM", "GS", "MS", "BAC", "C", "V", "MA"]
+
+        # Step 2: Quant Engine Screening
         scan_results = []
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -388,15 +400,13 @@ elif mode == "Market Scanner":
         for i, t in enumerate(scan_list):
             status_text.text(f"Querying Exchange Data for {t}... ({i+1}/{len(scan_list)})")
             
-            # Using our highly efficient yfinance hooks to pull pure price data
             d = get_daily_data(t)
             m = get_intraday_data(t)
             
             if d and m:
-                # FILTER LOGIC: Strict institutional criteria
                 if d['Score'] >= min_score:
                     if require_vwap and "SELL" in m['VWAP_Signal']:
-                        pass # Reject: Failed intraday VWAP
+                        pass 
                     else:
                         scan_results.append({
                             "Ticker": t,
@@ -409,35 +419,37 @@ elif mode == "Market Scanner":
                 
             progress_bar.progress((i + 1) / len(scan_list))
             
-        status_text.text(f"Screen Complete! Found {len(scan_results)} A+ setups in the {universe_choice} pool.")
+        status_text.text(f"Quant Screen Complete! Found {len(scan_results)} verified setups.")
         
         if scan_results:
             df_results = pd.DataFrame(scan_results)
             df_results = df_results.sort_values(by="Score", ascending=False).reset_index(drop=True)
             
-            # --- PREMIUM VISUAL HEATMAP ---
-            st.markdown("### 🗺️ Sector Momentum Heatmap")
-            df_results['Market'] = 'Alpha Setups'
+            # --- FIXED PREMIUM VISUAL HEATMAP ---
+            st.markdown("### 🗺️ Momentum Heatmap")
+            df_results['Market'] = 'Verified Setups'
+            df_results['Box_Size'] = df_results['Score'] + 1 # Ensures even score 0 has a visible box
+            
             fig = px.treemap(
                 df_results,
                 path=['Market', 'Ticker'],
-                values='RSI (1H)',
-                color='Score',
-                color_continuous_scale=['#2b2b36', '#FFFF00', '#00FFAA'],
-                range_color=[0, 4],
-                title="Size = Relative Strength (RSI) | Color = Tech Score"
+                values='Box_Size',
+                color='RSI (1H)',
+                color_continuous_scale='RdYlGn', # Red to Green gradient
+                range_color=[30, 70],            # Lock color bounds to RSI logic
+                title="Size = Tech Score  |  Color = RSI Momentum (Red=Oversold, Green=Overbought)"
             )
             fig.update_layout(margin=dict(t=30, l=10, r=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
             st.plotly_chart(fig, use_container_width=True)
             
-            st.markdown("### 📊 Verified Setups")
-            st.dataframe(df_results.drop(columns=['Market']), use_container_width=True)
+            st.markdown("### 📊 Live Data Feed")
+            st.dataframe(df_results.drop(columns=['Market', 'Box_Size']), use_container_width=True)
             
             st.markdown("---")
             st.markdown("### 🤖 Commander Deployment")
             ai_col1, ai_col2 = st.columns([3, 1])
             with ai_col1:
-                analyze_ticker = st.selectbox("Select a verified setup for deep AI analysis:", df_results['Ticker'].tolist())
+                analyze_ticker = st.selectbox("Select a setup for deep analysis:", df_results['Ticker'].tolist())
             with ai_col2:
                 st.write("") 
                 st.write("")
@@ -448,7 +460,7 @@ elif mode == "Market Scanner":
                         verdict = get_ai_master_analysis(analyze_ticker, d_ai, m_ai)
                         st.success(verdict)
         else:
-            st.warning("No stocks met your strict institutional criteria today. Cash is a position.")
+            st.warning("No stocks met your strict quant criteria today.")
 
 # --- MODE 3: BACKTEST ENGINE ---
 elif mode == "Backtest Engine":
