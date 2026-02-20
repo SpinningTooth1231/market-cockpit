@@ -382,8 +382,8 @@ elif mode == "Backtest Engine":
                 
                 # Format the dataframe into a beautiful heat-mapped table
                 st.dataframe(
-                    stats.style.format("{:.2f}%", subset=['Win_Rate_5D', 'Avg_Return_5D', 'Win_Rate_10D', 'Avg_Return_10D'])
-                               .background_gradient(cmap='RdYlGn', subset=['Win_Rate_5D', 'Win_Rate_10D']),
+                    stats.style.format("{:.2f}%", subset=['Win_Rate_5D', 'Avg_Return_5D'])
+                               .background_gradient(cmap='RdYlGn', subset=['Win_Rate_5D']),
                     use_container_width=True
                 )
                 
