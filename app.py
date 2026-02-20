@@ -343,88 +343,111 @@ if mode == "Single Ticker":
 
 # --- MODE 2: INSTITUTIONAL SCANNER ---
 elif mode == "Market Scanner":
-    st.subheader("📡 Institutional Market Scanner")
-    st.caption("Scan entire sectors for high-probability setups.")
+    st.subheader("📡 Institutional Liquidity Screener")
+    st.caption("Screen highly-liquid, institutional-grade assets using direct exchange data.")
     
-    # 1. Sector Selection
-    col1, col2 = st.columns([2, 1])
+    # --- INSTITUTIONAL LIQUIDITY UNIVERSE ---
+    # Real day traders don't scan 500 random stocks. They scan where the volume is.
+    def get_institutional_universe(category):
+        universes = {
+            "NYSE/NASDAQ Mega-Caps (High Volume)": ["NVDA", "AAPL", "MSFT", "AMZN", "META", "GOOGL", "TSLA", "AVGO", "LLY", "JPM"],
+            "High-Beta Semiconductors": ["NVDA", "AMD", "TSM", "SMCI", "ASML", "MU", "ARM", "QCOM", "TXN", "INTC"],
+            "Wall Street Financials & Banks": ["JPM", "GS", "MS", "BAC", "C", "WFC", "BLK", "BX", "V", "MA"],
+            "Crypto Proxy & Blockchain": ["MSTR", "COIN", "MARA", "RIOT", "CLSK", "HOOD", "IBIT"]
+        }
+        return universes.get(category, universes["NYSE/NASDAQ Mega-Caps (High Volume)"])
+
+    # 1. Premium Screener Controls
+    st.markdown("### 🎛️ Screener Parameters")
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        sector = st.selectbox("Select Sector to Scan", [
-            "Mega-Cap Tech",
-            "Semiconductors",
-            "Crypto & Blockchain",
+        universe_choice = st.selectbox("Liquidity Universe", [
+            "NYSE/NASDAQ Mega-Caps (High Volume)", 
+            "High-Beta Semiconductors", 
+            "Wall Street Financials & Banks",
+            "Crypto Proxy & Blockchain",
             "Custom List"
         ])
-    
     with col2:
-        if sector == "Mega-Cap Tech":
-            scan_list = ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA"]
-        elif sector == "Semiconductors":
-            scan_list = ["AMD", "TSM", "AVGO", "QCOM", "INTC", "ASML", "MU"]
-        elif sector == "Crypto & Blockchain":
-            scan_list = ["MSTR", "COIN", "MARA", "RIOT", "HUT"]
-        else:
-            custom_input = st.text_input("Enter tickers (comma separated)", "SPY, QQQ, IWM")
-            scan_list = [t.strip().upper() for t in custom_input.split(",")]
+        min_score = st.selectbox("Minimum Tech Score", [0, 1, 2, 3, 4], index=3)
+    with col3:
+        require_vwap = st.checkbox("Require Intraday VWAP 'BUY'")
+        
+    if universe_choice == "Custom List":
+        custom_input = st.text_input("Enter tickers (comma separated)", "SPY, QQQ, IWM, DIA")
+        scan_list = [t.strip().upper() for t in custom_input.split(",")]
+    else:
+        scan_list = get_institutional_universe(universe_choice)
 
-    if st.button("🚀 Run Deep Scan", use_container_width=True):
+    if st.button("🚀 Run Algorithmic Screen", use_container_width=True):
         scan_results = []
         progress_bar = st.progress(0)
         status_text = st.empty()
         
         for i, t in enumerate(scan_list):
-            status_text.text(f"Scanning {t}... ({i+1}/{len(scan_list)})")
+            status_text.text(f"Querying Exchange Data for {t}... ({i+1}/{len(scan_list)})")
+            
+            # Using our highly efficient yfinance hooks to pull pure price data
             d = get_daily_data(t)
             m = get_intraday_data(t)
             
             if d and m:
-                # Clean up emojis for the professional data table
-                trend_clean = d['Trend'].replace("🟢 ", "").replace("🔴 ", "")
-                macd_clean = d['MACD'].replace("🟢 ", "").replace("🔴 ", "")
-                vwap_clean = m['VWAP_Signal'].replace("🟢 ", "").replace("🔴 ", "")
-                
-                scan_results.append({
-                    "Ticker": t,
-                    "Score": d['Score'],
-                    "Price": f"${m['Current_Price']:.2f}",
-                    "1H Trend": trend_clean,
-                    "MACD": macd_clean,
-                    "RSI (1H)": d['RSI'],
-                    "Intraday VWAP": vwap_clean
-                })
+                # FILTER LOGIC: Strict institutional criteria
+                if d['Score'] >= min_score:
+                    if require_vwap and "SELL" in m['VWAP_Signal']:
+                        pass # Reject: Failed intraday VWAP
+                    else:
+                        scan_results.append({
+                            "Ticker": t,
+                            "Score": d['Score'],
+                            "Price": f"${m['Current_Price']:.2f}",
+                            "1H Trend": d['Trend'].replace("🟢 ", "").replace("🔴 ", ""),
+                            "RSI (1H)": float(d['RSI']),
+                            "Intraday VWAP": m['VWAP_Signal'].replace("🟢 ", "").replace("🔴 ", "")
+                        })
                 
             progress_bar.progress((i + 1) / len(scan_list))
             
-        status_text.text("Scan Complete!")
+        status_text.text(f"Screen Complete! Found {len(scan_results)} A+ setups in the {universe_choice} pool.")
         
         if scan_results:
-            # 2. Build the Interactive Data Table
             df_results = pd.DataFrame(scan_results)
             df_results = df_results.sort_values(by="Score", ascending=False).reset_index(drop=True)
             
-            st.markdown("### 📊 Scan Results")
-            st.dataframe(df_results, use_container_width=True)
+            # --- PREMIUM VISUAL HEATMAP ---
+            st.markdown("### 🗺️ Sector Momentum Heatmap")
+            df_results['Market'] = 'Alpha Setups'
+            fig = px.treemap(
+                df_results,
+                path=['Market', 'Ticker'],
+                values='RSI (1H)',
+                color='Score',
+                color_continuous_scale=['#2b2b36', '#FFFF00', '#00FFAA'],
+                range_color=[0, 4],
+                title="Size = Relative Strength (RSI) | Color = Tech Score"
+            )
+            fig.update_layout(margin=dict(t=30, l=10, r=10, b=10), paper_bgcolor="rgba(0,0,0,0)", font={'color': "white"})
+            st.plotly_chart(fig, use_container_width=True)
             
-            # 3. Quick AI Analysis Integration
+            st.markdown("### 📊 Verified Setups")
+            st.dataframe(df_results.drop(columns=['Market']), use_container_width=True)
+            
             st.markdown("---")
-            st.markdown("### 🤖 Quick AI Analysis")
-            
+            st.markdown("### 🤖 Commander Deployment")
             ai_col1, ai_col2 = st.columns([3, 1])
             with ai_col1:
-                analyze_ticker = st.selectbox("Select a stock from the results to send to the AI Commander:", df_results['Ticker'].tolist())
+                analyze_ticker = st.selectbox("Select a verified setup for deep AI analysis:", df_results['Ticker'].tolist())
             with ai_col2:
                 st.write("") 
                 st.write("")
-                run_ai = st.button(f"Analyze {analyze_ticker}")
-                
-            if run_ai:
-                with st.spinner(f"Commander analyzing {analyze_ticker}..."):
-                    d_ai = get_daily_data(analyze_ticker)
-                    m_ai = get_intraday_data(analyze_ticker)
-                    verdict = get_ai_master_analysis(analyze_ticker, d_ai, m_ai)
-                    st.success(verdict)
+                if st.button(f"Analyze {analyze_ticker}", key="ai_screen"):
+                    with st.spinner(f"Commander analyzing {analyze_ticker}..."):
+                        d_ai = get_daily_data(analyze_ticker)
+                        m_ai = get_intraday_data(analyze_ticker)
+                        verdict = get_ai_master_analysis(analyze_ticker, d_ai, m_ai)
+                        st.success(verdict)
         else:
-            st.warning("No data found for the selected tickers.")
+            st.warning("No stocks met your strict institutional criteria today. Cash is a position.")
 
 # --- MODE 3: BACKTEST ENGINE ---
 elif mode == "Backtest Engine":
