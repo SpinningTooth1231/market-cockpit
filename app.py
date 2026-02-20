@@ -222,33 +222,87 @@ if mode == "Single Ticker":
                 if title:
                     st.markdown(f"- {title}")
 
-# --- MODE 2: MARKET SCANNER ---
+# --- MODE 2: INSTITUTIONAL SCANNER ---
 elif mode == "Market Scanner":
-    st.subheader("🔍 Real-Time Opportunity Scanner")
-    st.caption("Scanning top assets for 4/4 setups...")
+    st.subheader("📡 Institutional Market Scanner")
+    st.caption("Scan entire sectors for high-probability setups.")
     
-    tickers = ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA", "AMD", "SPY", "QQQ"]
+    # 1. Sector Selection
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        sector = st.selectbox("Select Sector to Scan", [
+            "Mega-Cap Tech",
+            "Semiconductors",
+            "Crypto & Blockchain",
+            "Custom List"
+        ])
     
-    if st.button("Start Scan"):
-        progress = st.progress(0)
+    with col2:
+        if sector == "Mega-Cap Tech":
+            scan_list = ["NVDA", "AAPL", "MSFT", "AMZN", "GOOGL", "META", "TSLA"]
+        elif sector == "Semiconductors":
+            scan_list = ["AMD", "TSM", "AVGO", "QCOM", "INTC", "ASML", "MU"]
+        elif sector == "Crypto & Blockchain":
+            scan_list = ["MSTR", "COIN", "MARA", "RIOT", "HUT"]
+        else:
+            custom_input = st.text_input("Enter tickers (comma separated)", "SPY, QQQ, IWM")
+            scan_list = [t.strip().upper() for t in custom_input.split(",")]
+
+    if st.button("🚀 Run Deep Scan", use_container_width=True):
+        scan_results = []
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        for i, t in enumerate(tickers):
+        for i, t in enumerate(scan_list):
+            status_text.text(f"Scanning {t}... ({i+1}/{len(scan_list)})")
             d = get_daily_data(t)
-            progress.progress((i + 1) / len(tickers))
+            m = get_intraday_data(t)
             
-            if d:
-                if d['Score'] >= 3:
-                    with st.expander(f"🔥 {t} (Score: {d['Score']}/4) - CLICK TO EXPAND"):
-                        m = get_intraday_data(t)
-                        c1, c2 = st.columns(2)
-                        c1.metric("Hourly Trend", d['Trend'])
-                        c2.metric("Intraday Signal", m['VWAP_Signal'])
-                        
-                        if st.button(f"🤖 Get AI Verdict for {t}", key=f"btn_{t}"):
-                            with st.spinner(f"Commander analyzing {t}..."):
-                                verdict = get_ai_master_analysis(t, d, m)
-                                st.success(verdict)
-                                
-                elif d['Score'] <= 1:
-                    with st.expander(f"🔻 {t} (Score: {d['Score']}/4) - WEAK"):
-                        st.write("Bearish Setup. Wait for momentum shift.")
+            if d and m:
+                # Clean up emojis for the professional data table
+                trend_clean = d['Trend'].replace("🟢 ", "").replace("🔴 ", "")
+                macd_clean = d['MACD'].replace("🟢 ", "").replace("🔴 ", "")
+                vwap_clean = m['VWAP_Signal'].replace("🟢 ", "").replace("🔴 ", "")
+                
+                scan_results.append({
+                    "Ticker": t,
+                    "Score": d['Score'],
+                    "Price": f"${m['Current_Price']:.2f}",
+                    "1H Trend": trend_clean,
+                    "MACD": macd_clean,
+                    "RSI (1H)": d['RSI'],
+                    "Intraday VWAP": vwap_clean
+                })
+                
+            progress_bar.progress((i + 1) / len(scan_list))
+            
+        status_text.text("Scan Complete!")
+        
+        if scan_results:
+            # 2. Build the Interactive Data Table
+            df_results = pd.DataFrame(scan_results)
+            df_results = df_results.sort_values(by="Score", ascending=False).reset_index(drop=True)
+            
+            st.markdown("### 📊 Scan Results")
+            st.dataframe(df_results, use_container_width=True)
+            
+            # 3. Quick AI Analysis Integration
+            st.markdown("---")
+            st.markdown("### 🤖 Quick AI Analysis")
+            
+            ai_col1, ai_col2 = st.columns([3, 1])
+            with ai_col1:
+                analyze_ticker = st.selectbox("Select a stock from the results to send to the AI Commander:", df_results['Ticker'].tolist())
+            with ai_col2:
+                st.write("") 
+                st.write("")
+                run_ai = st.button(f"Analyze {analyze_ticker}")
+                
+            if run_ai:
+                with st.spinner(f"Commander analyzing {analyze_ticker}..."):
+                    d_ai = get_daily_data(analyze_ticker)
+                    m_ai = get_intraday_data(analyze_ticker)
+                    verdict = get_ai_master_analysis(analyze_ticker, d_ai, m_ai)
+                    st.success(verdict)
+        else:
+            st.warning("No data found for the selected tickers.")
