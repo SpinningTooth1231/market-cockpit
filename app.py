@@ -267,8 +267,8 @@ if mode == "Single Ticker":
     daily = get_daily_data(ticker)
     micro = get_intraday_data(ticker)
     
-    if daily and micro:
-       st.markdown("---")
+if daily and micro:
+        st.markdown("---")
         col1, col2, col3, col4 = st.columns(4)
         
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
@@ -291,10 +291,6 @@ if mode == "Single Ticker":
             st.markdown("<p style='font-size: 13px; color: #00FFAA; margin-top: 0px;'>Hourly Timeframe</p>", unsafe_allow_html=True)
             
         col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
-            st.plotly_chart(score_gauge, use_container_width=True)
-        with g2:
-            rsi_gauge = create_minimalist_gauge(float(micro['RSI_5m']), "5m Momentum", 0, 100, is_score=False)
-            st.plotly_chart(rsi_gauge, use_container_width=True)
 
         st.markdown("### 🤖 AI Commander's Verdict")
         with st.container():
