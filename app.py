@@ -293,7 +293,7 @@ if mode == "Single Ticker":
             
         col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
 
-st.markdown("### 🤖 AI Commander's Verdict")
+        st.markdown("### 🤖 AI Commander's Verdict")
         with st.status("🛸 Establishing secure uplink to AI Commander...", expanded=True) as status:
             st.write("Scanning hourly macro trends...")
             time.sleep(0.4)
