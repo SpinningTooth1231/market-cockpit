@@ -128,19 +128,23 @@ def get_ai_master_analysis(ticker, daily, micro):
     
     prompt = f"""
     Act as an elite Hedge Fund Manager and Quantitative Analyst. Ticker: {ticker}
+    LIVE PRICE: ${micro['Current_Price']:.2f}
+    
     1. MACRO (Hourly Chart): Trend: {daily['Trend']}, Tech Score: {daily['Score']}/4
-    2. MICRO (5m Chart): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
+    2. MICRO (5m Chart): VWAP Level: ${micro['VWAP_Price']:.2f} ({micro['VWAP_Signal']}), RSI: {micro['RSI_5m']}
     3. NEWS: {str(headlines)}
     
     YOUR TASK:
     Analyze the data above, specifically breaking down what the Tech Score ({daily['Score']}/4) means for the current momentum.
-    Then, provide a definitive execution plan formatted EXACTLY like this:
+    Calculate your targets strictly based on the LIVE PRICE of ${micro['Current_Price']:.2f}.
+    
+    Provide a definitive execution plan formatted EXACTLY like this:
 
     **Tech Score Breakdown:** (1 short sentence explaining the strength or weakness of the {daily['Score']}/4 score)
 
     **⚡ Day Trader Signal:** (BUY / SELL / HOLD)
-    - Target: (Price)
-    - Stop Loss: (Price)
+    - Target: (Calculate a logical price target from the Live Price)
+    - Stop Loss: (Calculate a strict stop loss from the Live Price)
     - Reasoning: (1 short sentence focusing on intraday momentum)
 
     **🛡️ Long-Term Signal:** (ACCUMULATE / REDUCE / HOLD)
