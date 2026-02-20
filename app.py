@@ -64,18 +64,22 @@ def get_daily_data(ticker):
         df = stock.history(period="1mo", interval="1h")
         if df.empty: return None
 
+        # 1. MACRO TREND: Price is respecting the 20-period moving average
         df['SMA_20'] = df['Close'].rolling(window=20).mean()
         trend = df['Close'].iloc[-1] > df['SMA_20'].iloc[-1]
 
+        # 2. GOLDILOCKS MOMENTUM: Strong (>50) but NOT Overbought (<70)
         df['RSI'] = calculate_rsi(df['Close'])
         rsi = df['RSI'].iloc[-1]
-        mom = rsi > 50
+        mom = (rsi > 50) and (rsi < 70)
 
+        # 3. VOLUME EXPANSION: Above average volume today or yesterday
         df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
         vol_today = df['Volume'].iloc[-1] > df['Vol_SMA'].iloc[-1]
         vol_yesterday = df['Volume'].iloc[-2] > df['Vol_SMA'].iloc[-2]
         vol = vol_today or vol_yesterday
 
+        # 4. MACD CONFIRMATION: Bullish trajectory
         macd_line, sig_line = calculate_macd(df['Close'])
         macd_bull = macd_line.iloc[-1] > sig_line.iloc[-1]
         
