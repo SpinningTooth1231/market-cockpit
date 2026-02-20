@@ -293,10 +293,20 @@ if mode == "Single Ticker":
             
         col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
 
-        st.markdown("### 🤖 AI Commander's Verdict")
-        with st.container():
+st.markdown("### 🤖 AI Commander's Verdict")
+        with st.status("🛸 Establishing secure uplink to AI Commander...", expanded=True) as status:
+            st.write("Scanning hourly macro trends...")
+            time.sleep(0.4)
+            st.write("Cross-referencing 5-minute VWAP liquidity...")
+            time.sleep(0.4)
+            st.write("Generating institutional execution plan...")
+            
+            # The actual API call
             verdict = get_ai_master_analysis(ticker, daily, micro)
-            st.success(verdict)
+            
+            status.update(label="Analysis Complete! Alpha locked in.", state="complete", expanded=False)
+            
+        st.success(verdict)
 
         # --- NEW FEATURE: RISK MANAGEMENT ENGINE ---
         st.markdown("### ⚖️ Auto-Calculated Risk Levels")
