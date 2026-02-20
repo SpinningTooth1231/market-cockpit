@@ -121,24 +121,24 @@ def run_backtest(ticker):
     df = stock.history(period="2y") 
     if df.empty: return None
 
-    # 1. MACRO TREND: Long-term Bullish
-    df['SMA_50'] = df['Close'].rolling(window=50).mean()
-    df['Macro_Trend'] = df['Close'] > df['SMA_50']
-    
-    # 2. MICRO PULLBACK: Short-term discount
+    # 1. MACRO TREND: Price is respecting the 20-day moving average
     df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['Micro_Dip'] = df['Close'] < df['SMA_20']
+    df['Trend'] = df['Close'] > df['SMA_20']
     
-    # 3. OVERSOLD MOMENTUM: Selling exhaustion
+    # 2. GOLDILOCKS MOMENTUM: Strong (>50) but NOT Overbought (<70)
     df['RSI'] = calculate_rsi(df['Close'])
-    df['Oversold'] = df['RSI'] < 45
+    df['Mom'] = (df['RSI'] > 50) & (df['RSI'] < 70)
     
-    # 4. VOLUME CAPITULATION: Institutions stepping in
+    # 3. VOLUME EXPANSION: Above average volume today or yesterday
     df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-    df['Vol_Cap'] = df['Volume'] > df['Vol_SMA']
+    df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
     
-    # Calculate the new Pullback Tech Score
-    df['Tech_Score'] = df['Macro_Trend'].astype(int) + df['Micro_Dip'].astype(int) + df['Oversold'].astype(int) + df['Vol_Cap'].astype(int)
+    # 4. MACD CONFIRMATION: Bullish trajectory
+    macd_line, sig_line = calculate_macd(df['Close'])
+    df['MACD_Bull'] = macd_line > sig_line
+    
+    # Calculate the balanced Tech Score
+    df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
     
     # Calculate Forward Returns (Look 5 and 10 days into the future)
     df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
