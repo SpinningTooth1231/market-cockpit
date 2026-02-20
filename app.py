@@ -3,6 +3,7 @@ import yfinance as yf
 import pandas as pd
 import google.generativeai as genai
 import time
+import plotly.graph_objects as go
 
 # --- PAGE CONFIGURATION (Must be first) ---
 st.set_page_config(layout="wide", page_title="AI Market Cockpit Pro", page_icon="🛸")
@@ -55,6 +56,33 @@ def calculate_vwap(df):
     v = df['Volume'].values
     tp = (df['High'] + df['Low'] + df['Close']) / 3
     return df.assign(VWAP=(tp * v).cumsum() / v.cumsum())
+
+def create_minimalist_gauge(value, title, min_val, max_val, is_score=False):
+    # Dynamic institutional color coding
+    if is_score:
+        color = "#00FF00" if value >= 3 else "#FF0000" if value <= 1 else "#FFFF00"
+    else: 
+        color = "#00FF00" if 50 < value < 70 else "#FF0000" if value > 70 else "#FFFF00"
+        
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=value,
+        title={'text': title, 'font': {'size': 18, 'color': 'white'}},
+        gauge={
+            'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': "white"},
+            'bar': {'color': color},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 0,
+        }
+    ))
+    
+    fig.update_layout(
+        paper_bgcolor="rgba(0,0,0,0)", # Keeps it cleanly transparent
+        font={'color': "white", 'family': "sans-serif"},
+        height=250,
+        margin=dict(l=20, r=20, t=30, b=20)
+    )
+    return fig
 
 # --- DATA FETCHING ---
 def get_daily_data(ticker):
@@ -240,13 +268,20 @@ if mode == "Single Ticker":
     micro = get_intraday_data(ticker)
     
     if daily and micro:
-        st.markdown("---")
-        col1, col2, col3, col4 = st.columns(4)
+st.markdown("---")
+        # Top Row: Clean Price Metrics
+        col1, col2 = st.columns(2)
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
         col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
-        # UPDATED TO HOURLY TIMEFRAME
-        col3.metric("Tech Score", f"{daily['Score']}/4", delta="Hourly Timeframe")
-        col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
+        
+        # Bottom Row: Premium Radial Gauges
+        g1, g2 = st.columns(2)
+        with g1:
+            score_gauge = create_minimalist_gauge(daily['Score'], "Tech Score", 0, 4, is_score=True)
+            st.plotly_chart(score_gauge, use_container_width=True)
+        with g2:
+            rsi_gauge = create_minimalist_gauge(float(micro['RSI_5m']), "5m Momentum", 0, 100, is_score=False)
+            st.plotly_chart(rsi_gauge, use_container_width=True)
         
         st.markdown("### 🤖 AI Commander's Verdict")
         with st.container():
