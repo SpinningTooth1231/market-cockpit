@@ -4,6 +4,7 @@ import pandas as pd
 import google.generativeai as genai
 import time
 import plotly.graph_objects as go
+import plotly.express as px  # <--- ADD THIS LINE HERE
 
 # --- PAGE CONFIGURATION (Must be first) ---
 st.set_page_config(layout="wide", page_title="AI Market Cockpit Pro", page_icon="🛸")
