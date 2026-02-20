@@ -125,37 +125,36 @@ def run_backtest(ticker):
     df = stock.history(period="2y") 
     if df.empty: return None
 
-    # 1. MACRO TREND: Price is respecting the 20-day moving average
+    # 1. INSTITUTIONAL TREND FILTER (200-Day SMA)
+    df['SMA_200'] = df['Close'].rolling(window=200).mean()
+    df['Trend_Filter'] = df['Close'] > df['SMA_200']
+    
+    # 2. SHORT-TERM TREND (20-Day SMA)
     df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['Trend'] = df['Close'] > df['SMA_20']
+    df['Short_Trend'] = df['Close'] > df['SMA_20']
     
-    # 2. GOLDILOCKS MOMENTUM: Strong (>50) but NOT Overbought (<70)
+    # 3. GOLDILOCKS RSI: Not overextended
     df['RSI'] = calculate_rsi(df['Close'])
-    df['Mom'] = (df['RSI'] > 50) & (df['RSI'] < 70)
+    df['Mom_Safe'] = (df['RSI'] > 50) & (df['RSI'] < 65)
     
-    # 3. VOLUME EXPANSION: Above average volume today or yesterday
+    # 4. INSTITUTIONAL VOLUME (1.5x Multiplier)
     df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-    df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
+    df['Vol_Conf'] = df['Volume'] > (df['Vol_SMA'] * 1.5)
     
-    # 4. MACD CONFIRMATION: Bullish trajectory
-    macd_line, sig_line = calculate_macd(df['Close'])
-    df['MACD_Bull'] = macd_line > sig_line
+    # Calculate New High-Confidence Tech Score
+    # We only count indicators IF the 200-day trend filter is met
+    df['Tech_Score'] = (df['Short_Trend'].astype(int) + 
+                        df['Mom_Safe'].astype(int) + 
+                        df['Vol_Conf'].astype(int)) * df['Trend_Filter'].astype(int)
     
-    # Calculate the balanced Tech Score
-    df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
-    
-    # Calculate Forward Returns (Look 5 and 10 days into the future)
+    # Calculate Forward Returns
     df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
-    df['Return_10D'] = df['Close'].shift(-10) / df['Close'] - 1
-    
     df = df.dropna() 
     
     stats = df.groupby('Tech_Score').agg(
         Occurrences=('Close', 'count'),
         Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean() * 100),
-        Avg_Return_5D=('Return_5D', lambda x: x.mean() * 100),
-        Win_Rate_10D=('Return_10D', lambda x: (x > 0).mean() * 100),
-        Avg_Return_10D=('Return_10D', lambda x: x.mean() * 100)
+        Avg_Return_5D=('Return_5D', lambda x: x.mean() * 100)
     ).round(2)
     
     return stats
