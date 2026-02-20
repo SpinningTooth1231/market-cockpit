@@ -118,32 +118,34 @@ def get_intraday_data(ticker):
 
 def run_backtest(ticker):
     stock = yf.Ticker(ticker)
-    df = stock.history(period="2y") # 2 years of data for a solid sample size
+    df = stock.history(period="2y") 
     if df.empty: return None
 
-    # Calculate indicators for the entire 2-year dataframe
+    # 1. MACRO TREND: Long-term Bullish
+    df['SMA_50'] = df['Close'].rolling(window=50).mean()
+    df['Macro_Trend'] = df['Close'] > df['SMA_50']
+    
+    # 2. MICRO PULLBACK: Short-term discount
     df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['Trend'] = df['Close'] > df['SMA_20']
+    df['Micro_Dip'] = df['Close'] < df['SMA_20']
     
+    # 3. OVERSOLD MOMENTUM: Selling exhaustion
     df['RSI'] = calculate_rsi(df['Close'])
-    df['Mom'] = df['RSI'] > 50
+    df['Oversold'] = df['RSI'] < 45
     
+    # 4. VOLUME CAPITULATION: Institutions stepping in
     df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-    df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
+    df['Vol_Cap'] = df['Volume'] > df['Vol_SMA']
     
-    macd_line, sig_line = calculate_macd(df['Close'])
-    df['MACD_Bull'] = macd_line > sig_line
-    
-    # Calculate the Tech Score for every single day in history
-    df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
+    # Calculate the new Pullback Tech Score
+    df['Tech_Score'] = df['Macro_Trend'].astype(int) + df['Micro_Dip'].astype(int) + df['Oversold'].astype(int) + df['Vol_Cap'].astype(int)
     
     # Calculate Forward Returns (Look 5 and 10 days into the future)
     df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
     df['Return_10D'] = df['Close'].shift(-10) / df['Close'] - 1
     
-    df = df.dropna() # Clean up recent days that don't have future data yet
+    df = df.dropna() 
     
-    # Group by the Tech Score to get the win rates
     stats = df.groupby('Tech_Score').agg(
         Occurrences=('Close', 'count'),
         Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean() * 100),
