@@ -383,31 +383,38 @@ elif mode == "Market Scanner":
 
 # --- MODE 3: BACKTEST ENGINE ---
 elif mode == "Backtest Engine":
-    st.subheader("⏱️ Historical Accuracy Backtester")
-    st.caption("Proving the Tech Score's win rate over the last 2 years.")
+    st.subheader("⏱️ Pro Quant Backtester")
+    st.caption("Dynamically test strategies and calculate trade expectancy.")
     
-    test_ticker = st.text_input("Enter Ticker to Backtest", value="NVDA").upper()
-    
-    if st.button("Run 2-Year Backtest"):
-        with st.spinner(f"Crunching 2 years of daily data for {test_ticker}..."):
-            stats = run_backtest(test_ticker)
+    # Interactive Sliders
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        test_ticker = st.text_input("Ticker to Backtest", value="NVDA").upper()
+    with col2:
+        sma_val = st.slider("Trend Filter (SMA)", min_value=10, max_value=200, value=20, step=10)
+    with col3:
+        rsi_range = st.slider("Momentum Zone (RSI)", min_value=10, max_value=90, value=(50, 70))
+        
+    if st.button("Run Dynamic Backtest", use_container_width=True):
+        with st.spinner(f"Running thousands of calculations for {test_ticker}..."):
+            stats = run_backtest(test_ticker, sma_val, rsi_range[0], rsi_range[1])
             
             if stats is not None and not stats.empty:
-                st.markdown(f"### 📊 Institutional Performance Matrix for {test_ticker}")
-                st.write("This table tracks exactly what happened to the stock 5 days AFTER it registered a specific Market Phase.")
-                
-                # Format the dataframe into a beautiful heat-mapped table
+                st.markdown(f"### 📊 Algorithmic Matrix for {test_ticker}")
                 st.dataframe(
-                    stats.style.format("{:.2f}%", subset=['Win_Rate_5D', 'Avg_Return_5D'])
-                               .background_gradient(cmap='RdYlGn', subset=['Win_Rate_5D']),
+                    stats.style.format("{:.2f}%", subset=['Win_Rate_5D', 'Expectancy'])
+                               .background_gradient(cmap='RdYlGn', subset=['Expectancy']),
                     use_container_width=True
                 )
                 
-                # Dynamic Institutional Insight that reads the new string labels
-                target_label = "4/4 - 🔥 Perfect A+ Setup"
-                if target_label in stats.index:
-                    win_5 = stats.loc[target_label, 'Win_Rate_5D']
-                    occurrences = stats.loc[target_label, 'Occurrences']
-                    st.success(f"**🎯 Institutional Insight:** Over the last 2 years, {test_ticker} hit a **Perfect A+ Setup** {occurrences} times. Buying these setups yielded a **{win_5}% probability** of profit 5 days later.")
+                # Dynamic Edge Detection AI
+                best_row = stats['Expectancy'].idxmax()
+                best_exp = stats.loc[best_row, 'Expectancy']
+                best_win = stats.loc[best_row, 'Win_Rate_5D']
+                
+                if best_exp > 0:
+                    st.success(f"**🤖 Alpha Detected:** The mathematical optimal edge for {test_ticker} is buying the **{best_row}** phase. Over the last 2 years, this setup yielded a **{best_win}% win rate** and a positive expectancy of **+{best_exp}%** per trade.")
+                else:
+                    st.error(f"**⚠️ No Alpha:** Even the best setup ({best_row}) has a negative expectancy of {best_exp}%. Avoid trading this asset with these parameters.")
             else:
                 st.error("Not enough data to run backtest.")
