@@ -268,7 +268,7 @@ if mode == "Single Ticker":
     micro = get_intraday_data(ticker)
     
     if daily and micro:
-st.markdown("---")
+    st.markdown("---")
         # Top Row: Clean Price Metrics
         col1, col2 = st.columns(2)
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
