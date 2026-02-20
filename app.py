@@ -30,13 +30,12 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURATION ---
-# PASTE YOUR API KEY BELOW
 # Fetch the key securely from Streamlit Secrets
-GOOG_API_KEY = st.secrets["GOOG_API_KEY"]
 try:
+    GOOG_API_KEY = st.secrets["GOOG_API_KEY"]
     genai.configure(api_key=GOOG_API_KEY)
 except Exception as e:
-    st.error(f"API Key Error: {e}")
+    st.error(f"API Key Error: Please check your Streamlit Secrets.")
 
 # --- MATH ENGINE ---
 def calculate_rsi(series, period=14):
@@ -70,11 +69,9 @@ def get_daily_data(ticker):
 
         df['RSI'] = calculate_rsi(df['Close'])
         rsi = df['RSI'].iloc[-1]
-        # FIX 1: Removed the < 70 ceiling. Anything over 50 is Bullish momentum!
         mom = rsi > 50
 
         df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-        # FIX 2: Check if TODAY or YESTERDAY had high volume to avoid the "Morning Trap"
         vol_today = df['Volume'].iloc[-1] > df['Vol_SMA'].iloc[-1]
         vol_yesterday = df['Volume'].iloc[-2] > df['Vol_SMA'].iloc[-2]
         vol = vol_today or vol_yesterday
@@ -194,7 +191,10 @@ if mode == "Single Ticker":
                 st.write(f"**Trend:** {daily['Trend']}")
                 st.write(f"**MACD:** {daily['MACD']}")
                 st.write(f"**Volume:** {daily['Vol']}")
-                st.progress(daily['RSI_Raw']/100, text=f"RSI Strength: {daily['RSI']}")
+                
+                # FIX 1: Safely clamp RSI to prevent Streamlit limits crash
+                safe_rsi = max(0.0, min(daily['RSI_Raw'] / 100.0, 1.0))
+                st.progress(safe_rsi, text=f"RSI Strength: {daily['RSI']}")
         
         with col_right:
             with st.expander("🎯 View Micro (5-Min) Details", expanded=False):
@@ -230,7 +230,13 @@ elif mode == "Market Scanner":
                         c1, c2 = st.columns(2)
                         c1.metric("Trend", d['Trend'])
                         c2.metric("Intraday Signal", m['VWAP_Signal'])
-                        st.button(f"Analyze {t}", key=f"btn_{t}")
+                        
+                        # FIX 2: Added inline AI Analysis for the scanner
+                        if st.button(f"🤖 Get AI Verdict for {t}", key=f"btn_{t}"):
+                            with st.spinner(f"Commander analyzing {t}..."):
+                                verdict = get_ai_master_analysis(t, d, m)
+                                st.success(verdict)
+                                
                 elif d['Score'] <= 1:
                     with st.expander(f"🔻 {t} (Score: {d['Score']}/4) - WEAK"):
                         st.write("Bearish Setup. Be careful.")
