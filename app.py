@@ -117,7 +117,8 @@ def get_intraday_data(ticker):
     except: return None
 
 def get_ai_master_analysis(ticker, daily, micro):
-    model = genai.GenerativeModel('gemini-2.5-flash')
+    # Upgraded to Gemini 2.5 Pro for advanced reasoning
+    model = genai.GenerativeModel('gemini-2.5-pro')
     
     headlines = []
     if daily['News']:
@@ -126,16 +127,25 @@ def get_ai_master_analysis(ticker, daily, micro):
             if title: headlines.append(f"- {title}")
     
     prompt = f"""
-    Act as a Hedge Fund Manager. Ticker: {ticker}
-    1. MACRO (Hourly Chart): Trend: {daily['Trend']}, Score: {daily['Score']}/4
+    Act as an elite Hedge Fund Manager and Quantitative Analyst. Ticker: {ticker}
+    1. MACRO (Hourly Chart): Trend: {daily['Trend']}, Tech Score: {daily['Score']}/4
     2. MICRO (5m Chart): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
     3. NEWS: {str(headlines)}
     
     YOUR TASK:
-    Provide a "Sniper Execution Plan".
-    - Verdict: (Buy Now / Wait for Dip / Short Sell)
-    - Key Level: (Where to put Stop Loss)
-    - Reasoning: (1 short sentence)
+    Analyze the data above, specifically breaking down what the Tech Score ({daily['Score']}/4) means for the current momentum.
+    Then, provide a definitive execution plan formatted EXACTLY like this:
+
+    **Tech Score Breakdown:** (1 short sentence explaining the strength or weakness of the {daily['Score']}/4 score)
+
+    **⚡ Day Trader Signal:** (BUY / SELL / HOLD)
+    - Target: (Price)
+    - Stop Loss: (Price)
+    - Reasoning: (1 short sentence focusing on intraday momentum)
+
+    **🛡️ Long-Term Signal:** (ACCUMULATE / REDUCE / HOLD)
+    - Key Level: (Macro support/resistance to watch)
+    - Reasoning: (1 short sentence focusing on macro trends and news)
     """
     for _ in range(3):
         try:
