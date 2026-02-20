@@ -268,16 +268,29 @@ if mode == "Single Ticker":
     micro = get_intraday_data(ticker)
     
     if daily and micro:
-        st.markdown("---")
-        # Top Row: Clean Price Metrics
-        col1, col2 = st.columns(2)
+       st.markdown("---")
+        col1, col2, col3, col4 = st.columns(4)
+        
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
         col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
         
-        # Bottom Row: Premium Radial Gauges
-        g1, g2 = st.columns(2)
-        with g1:
-            score_gauge = create_minimalist_gauge(daily['Score'], "Tech Score", 0, 4, is_score=True)
+        # --- PREMIUM '4 LIGHTS' LED INDICATOR ---
+        score = int(daily['Score'])
+        with col3:
+            st.markdown("<p style='font-size: 14px; color: #b0b4bd; margin-bottom: 0px;'>Tech Score</p>", unsafe_allow_html=True)
+            lights = "<div style='display: flex; gap: 8px; margin-top: 12px; margin-bottom: 12px;'>"
+            for i in range(4):
+                if i < score:
+                    # Glowing Green LED
+                    lights += "<div style='width: 16px; height: 16px; border-radius: 50%; background-color: #00FFAA; box-shadow: 0 0 10px #00FFAA;'></div>"
+                else:
+                    # 'Off' Grey LED
+                    lights += "<div style='width: 16px; height: 16px; border-radius: 50%; background-color: #2b2b36;'></div>"
+            lights += "</div>"
+            st.markdown(lights, unsafe_allow_html=True)
+            st.markdown("<p style='font-size: 13px; color: #00FFAA; margin-top: 0px;'>Hourly Timeframe</p>", unsafe_allow_html=True)
+            
+        col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
             st.plotly_chart(score_gauge, use_container_width=True)
         with g2:
             rsi_gauge = create_minimalist_gauge(float(micro['RSI_5m']), "5m Momentum", 0, 100, is_score=False)
