@@ -92,6 +92,30 @@ def get_daily_data(ticker):
         }
     except: return None
 
+def get_intraday_data(ticker):
+    try:
+        stock = yf.Ticker(ticker)
+        df = stock.history(period="5d", interval="5m")
+        if df.empty: return None
+
+        df = calculate_vwap(df)
+        df['RSI'] = calculate_rsi(df['Close'])
+        
+        last_close = df['Close'].iloc[-1]
+        last_vwap = df['VWAP'].iloc[-1]
+        last_rsi = df['RSI'].iloc[-1]
+        
+        vwap_signal = last_close > last_vwap
+        
+        return {
+            "Current_Price": last_close,
+            "VWAP_Price": last_vwap,
+            "VWAP_Signal": "🟢 BUY" if vwap_signal else "🔴 SELL",
+            "RSI_5m": f"{last_rsi:.1f}",
+            "RSI_Status": "🔥 HOT" if last_rsi > 70 else "❄️ COLD" if last_rsi < 30 else "✅ OK"
+        }
+    except: return None
+
 def run_backtest(ticker):
     stock = yf.Ticker(ticker)
     df = stock.history(period="2y") # 2 years of data for a solid sample size
