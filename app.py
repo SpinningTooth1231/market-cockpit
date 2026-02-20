@@ -267,7 +267,7 @@ if mode == "Single Ticker":
     daily = get_daily_data(ticker)
     micro = get_intraday_data(ticker)
     
-if daily and micro:
+    if daily and micro:
         st.markdown("---")
         col1, col2, col3, col4 = st.columns(4)
         
