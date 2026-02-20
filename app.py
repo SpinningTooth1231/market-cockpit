@@ -92,29 +92,43 @@ def get_daily_data(ticker):
         }
     except: return None
 
-def get_intraday_data(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        df = stock.history(period="5d", interval="5m")
-        if df.empty: return None
+def run_backtest(ticker):
+    stock = yf.Ticker(ticker)
+    df = stock.history(period="2y") # 2 years of data for a solid sample size
+    if df.empty: return None
 
-        df = calculate_vwap(df)
-        df['RSI'] = calculate_rsi(df['Close'])
-        
-        last_close = df['Close'].iloc[-1]
-        last_vwap = df['VWAP'].iloc[-1]
-        last_rsi = df['RSI'].iloc[-1]
-        
-        vwap_signal = last_close > last_vwap
-        
-        return {
-            "Current_Price": last_close,
-            "VWAP_Price": last_vwap,
-            "VWAP_Signal": "🟢 BUY" if vwap_signal else "🔴 SELL",
-            "RSI_5m": f"{last_rsi:.1f}",
-            "RSI_Status": "🔥 HOT" if last_rsi > 70 else "❄️ COLD" if last_rsi < 30 else "✅ OK"
-        }
-    except: return None
+    # Calculate indicators for the entire 2-year dataframe
+    df['SMA_20'] = df['Close'].rolling(window=20).mean()
+    df['Trend'] = df['Close'] > df['SMA_20']
+    
+    df['RSI'] = calculate_rsi(df['Close'])
+    df['Mom'] = df['RSI'] > 50
+    
+    df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
+    df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
+    
+    macd_line, sig_line = calculate_macd(df['Close'])
+    df['MACD_Bull'] = macd_line > sig_line
+    
+    # Calculate the Tech Score for every single day in history
+    df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
+    
+    # Calculate Forward Returns (Look 5 and 10 days into the future)
+    df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
+    df['Return_10D'] = df['Close'].shift(-10) / df['Close'] - 1
+    
+    df = df.dropna() # Clean up recent days that don't have future data yet
+    
+    # Group by the Tech Score to get the win rates
+    stats = df.groupby('Tech_Score').agg(
+        Occurrences=('Close', 'count'),
+        Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean() * 100),
+        Avg_Return_5D=('Return_5D', lambda x: x.mean() * 100),
+        Win_Rate_10D=('Return_10D', lambda x: (x > 0).mean() * 100),
+        Avg_Return_10D=('Return_10D', lambda x: x.mean() * 100)
+    ).round(2)
+    
+    return stats
 
 def get_ai_master_analysis(ticker, daily, micro):
     # Upgraded to Gemini 2.5 Pro for advanced reasoning
@@ -169,7 +183,8 @@ with c2:
 
 with st.sidebar:
     st.header("⚙️ Control Panel")
-    mode = st.radio("Select Mode", ["Single Ticker", "Market Scanner"])
+    # ADDED THE BACKTEST ENGINE TO THE MENU HERE
+    mode = st.radio("Select Mode", ["Single Ticker", "Market Scanner", "Backtest Engine"])
     st.info("Scanner checks: NVDA, AAPL, MSFT, TSLA, AMD, SPY, QQQ")
 
 # --- MODE 1: SINGLE TICKER ---
@@ -320,3 +335,32 @@ elif mode == "Market Scanner":
                     st.success(verdict)
         else:
             st.warning("No data found for the selected tickers.")
+
+# --- MODE 3: BACKTEST ENGINE ---
+elif mode == "Backtest Engine":
+    st.subheader("⏱️ Historical Accuracy Backtester")
+    st.caption("Proving the Tech Score's win rate over the last 2 years.")
+    
+    test_ticker = st.text_input("Enter Ticker to Backtest", value="NVDA").upper()
+    
+    if st.button("Run 2-Year Backtest"):
+        with st.spinner(f"Crunching 2 years of daily data for {test_ticker}..."):
+            stats = run_backtest(test_ticker)
+            
+            if stats is not None and not stats.empty:
+                st.markdown(f"### 📊 Tech Score Performance for {test_ticker}")
+                st.write("This table tracks exactly what happened to the stock 5 days and 10 days AFTER it registered a specific Tech Score.")
+                
+                # Format the dataframe into a beautiful heat-mapped table
+                st.dataframe(
+                    stats.style.format("{:.2f}%", subset=['Win_Rate_5D', 'Avg_Return_5D', 'Win_Rate_10D', 'Avg_Return_10D'])
+                               .background_gradient(cmap='RdYlGn', subset=['Win_Rate_5D', 'Win_Rate_10D']),
+                    use_container_width=True
+                )
+                
+                # Extract the 4/4 win rate for a dynamic insight
+                if 4 in stats.index:
+                    win_5 = stats.loc[4, 'Win_Rate_5D']
+                    st.success(f"**Institutional Insight:** When {test_ticker} hits a perfect 4/4 Tech Score, historical data shows it has a **{win_5}% probability** of being profitable 5 days later.")
+            else:
+                st.error("Not enough data to run backtest.")
