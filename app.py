@@ -308,7 +308,7 @@ if daily and micro:
                 r2.metric("🎯 Cover Target 1 (-1.5%)", f"${tp1:.2f}")
                 r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")
 
-st.markdown("---")
+    st.markdown("---")
         
         col_left, col_right = st.columns(2)
         with col_left:
