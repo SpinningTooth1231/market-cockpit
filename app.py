@@ -70,10 +70,14 @@ def get_daily_data(ticker):
 
         df['RSI'] = calculate_rsi(df['Close'])
         rsi = df['RSI'].iloc[-1]
-        mom = 50 < rsi < 70
+        # FIX 1: Removed the < 70 ceiling. Anything over 50 is Bullish momentum!
+        mom = rsi > 50
 
         df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-        vol = df['Volume'].iloc[-1] > df['Vol_SMA'].iloc[-1]
+        # FIX 2: Check if TODAY or YESTERDAY had high volume to avoid the "Morning Trap"
+        vol_today = df['Volume'].iloc[-1] > df['Vol_SMA'].iloc[-1]
+        vol_yesterday = df['Volume'].iloc[-2] > df['Vol_SMA'].iloc[-2]
+        vol = vol_today or vol_yesterday
 
         macd_line, sig_line = calculate_macd(df['Close'])
         macd_bull = macd_line.iloc[-1] > sig_line.iloc[-1]
