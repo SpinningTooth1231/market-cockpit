@@ -61,7 +61,7 @@ def calculate_vwap(df):
 def get_daily_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-        df = stock.history(period="6mo")
+       df = stock.history(period="1mo", interval="1h")
         if df.empty: return None
 
         df['SMA_20'] = df['Close'].rolling(window=20).mean()
@@ -127,7 +127,7 @@ def get_ai_master_analysis(ticker, daily, micro):
     
     prompt = f"""
     Act as a Hedge Fund Manager. Ticker: {ticker}
-    1. MACRO (Daily): Trend: {daily['Trend']}, Score: {daily['Score']}/4
+    1. MACRO (Hourly): Trend: {daily['Trend']}, Score: {daily['Score']}/4
     2. MICRO (5m): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
     3. NEWS: {str(headlines)}
     
@@ -174,7 +174,7 @@ if mode == "Single Ticker":
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
         col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
-        col3.metric("Tech Score", f"{daily['Score']}/4", delta="Daily Timeframe")
+        col3.metric("Tech Score", f"{daily['Score']}/4", delta="Hourly Timeframe")
         col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
         
         # 2. AI COMMANDER (The Decision)
@@ -189,7 +189,7 @@ if mode == "Single Ticker":
         col_left, col_right = st.columns(2)
         
         with col_left:
-            with st.expander("📊 View Macro (Daily) Details", expanded=False):
+            with st.expander("📊 View Macro (Hourly) Details", expanded=False):
                 st.write(f"**Trend:** {daily['Trend']}")
                 st.write(f"**MACD:** {daily['MACD']}")
                 st.write(f"**Volume:** {daily['Vol']}")
