@@ -293,7 +293,7 @@ if daily and micro:
             entry = micro['Current_Price']
             r1, r2, r3 = st.columns(3)
             
-            if "BUY" in micro['VWAP_Signal']:
+if "BUY" in micro['VWAP_Signal']:
                 sl = entry * 0.99
                 tp1 = entry * 1.015
                 tp2 = entry * 1.03
@@ -306,7 +306,7 @@ if daily and micro:
                 tp2 = entry * 0.97
                 r1.metric("🛑 Short Stop (+1%)", f"${sl:.2f}")
                 r2.metric("🎯 Cover Target 1 (-1.5%)", f"${tp1:.2f}")
-                r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")v
+                r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")
         if "BUY" in micro['VWAP_Signal']:
             sl = entry * 0.99
             tp1 = entry * 1.015
