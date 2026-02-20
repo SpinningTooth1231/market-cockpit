@@ -267,48 +267,48 @@ if mode == "Single Ticker":
     daily = get_daily_data(ticker)
     micro = get_intraday_data(ticker)
     
-if daily and micro:
-            st.markdown("---")
-            # Top Row: Clean Price Metrics
-            col1, col2 = st.columns(2)
-            col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
-            col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
-            
-            # Bottom Row: Premium Radial Gauges
-            g1, g2 = st.columns(2)
-            with g1:
-                score_gauge = create_minimalist_gauge(daily['Score'], "Tech Score", 0, 4, is_score=True)
-                st.plotly_chart(score_gauge, use_container_width=True)
-            with g2:
-                rsi_gauge = create_minimalist_gauge(float(micro['RSI_5m']), "5m Momentum", 0, 100, is_score=False)
-                st.plotly_chart(rsi_gauge, use_container_width=True)
+    if daily and micro:
+        st.markdown("---")
+        # Top Row: Clean Price Metrics
+        col1, col2 = st.columns(2)
+        col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
+        col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
+        
+        # Bottom Row: Premium Radial Gauges
+        g1, g2 = st.columns(2)
+        with g1:
+            score_gauge = create_minimalist_gauge(daily['Score'], "Tech Score", 0, 4, is_score=True)
+            st.plotly_chart(score_gauge, use_container_width=True)
+        with g2:
+            rsi_gauge = create_minimalist_gauge(float(micro['RSI_5m']), "5m Momentum", 0, 100, is_score=False)
+            st.plotly_chart(rsi_gauge, use_container_width=True)
 
-            st.markdown("### 🤖 AI Commander's Verdict")
-            with st.container():
-                verdict = get_ai_master_analysis(ticker, daily, micro)
-                st.success(verdict)
+        st.markdown("### 🤖 AI Commander's Verdict")
+        with st.container():
+            verdict = get_ai_master_analysis(ticker, daily, micro)
+            st.success(verdict)
 
-# --- NEW FEATURE: RISK MANAGEMENT ENGINE ---
-            st.markdown("### ⚖️ Auto-Calculated Risk Levels")
-            entry = micro['Current_Price']
-            r1, r2, r3 = st.columns(3)
-            
-            if "BUY" in micro['VWAP_Signal']:
-                sl = entry * 0.99
-                tp1 = entry * 1.015
-                tp2 = entry * 1.03
-                r1.metric("🛑 Stop Loss (-1%)", f"${sl:.2f}")
-                r2.metric("🎯 Take Profit 1 (+1.5%)", f"${tp1:.2f}")
-                r3.metric("🚀 Take Profit 2 (+3%)", f"${tp2:.2f}")
-            else:
-                sl = entry * 1.01
-                tp1 = entry * 0.985
-                tp2 = entry * 0.97
-                r1.metric("🛑 Short Stop (+1%)", f"${sl:.2f}")
-                r2.metric("🎯 Cover Target 1 (-1.5%)", f"${tp1:.2f}")
-                r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")
+        # --- NEW FEATURE: RISK MANAGEMENT ENGINE ---
+        st.markdown("### ⚖️ Auto-Calculated Risk Levels")
+        entry = micro['Current_Price']
+        r1, r2, r3 = st.columns(3)
+        
+        if "BUY" in micro['VWAP_Signal']:
+            sl = entry * 0.99
+            tp1 = entry * 1.015
+            tp2 = entry * 1.03
+            r1.metric("🛑 Stop Loss (-1%)", f"${sl:.2f}")
+            r2.metric("🎯 Take Profit 1 (+1.5%)", f"${tp1:.2f}")
+            r3.metric("🚀 Take Profit 2 (+3%)", f"${tp2:.2f}")
+        else:
+            sl = entry * 1.01
+            tp1 = entry * 0.985
+            tp2 = entry * 0.97
+            r1.metric("🛑 Short Stop (+1%)", f"${sl:.2f}")
+            r2.metric("🎯 Cover Target 1 (-1.5%)", f"${tp1:.2f}")
+            r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")
 
-    st.markdown("---")
+        st.markdown("---")
         
         col_left, col_right = st.columns(2)
         with col_left:
