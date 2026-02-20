@@ -125,29 +125,26 @@ def run_backtest(ticker):
     df = stock.history(period="2y") 
     if df.empty: return None
 
-    # 1. INSTITUTIONAL TREND FILTER (200-Day SMA)
-    df['SMA_200'] = df['Close'].rolling(window=200).mean()
-    df['Trend_Filter'] = df['Close'] > df['SMA_200']
-    
-    # 2. SHORT-TERM TREND (20-Day SMA)
+    # 1. TREND: Price is respecting the 20-day moving average
     df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['Short_Trend'] = df['Close'] > df['SMA_20']
+    df['Trend'] = df['Close'] > df['SMA_20']
     
-    # 3. GOLDILOCKS RSI: Not overextended
+    # 2. MOMENTUM: Strong but not overbought (RSI between 50 and 70)
     df['RSI'] = calculate_rsi(df['Close'])
-    df['Mom_Safe'] = (df['RSI'] > 50) & (df['RSI'] < 65)
+    df['Mom'] = (df['RSI'] > 50) & (df['RSI'] < 70)
     
-    # 4. INSTITUTIONAL VOLUME (1.5x Multiplier)
+    # 3. VOLUME: Above average volume today or yesterday
     df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
-    df['Vol_Conf'] = df['Volume'] > (df['Vol_SMA'] * 1.5)
+    df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
     
-    # Calculate New High-Confidence Tech Score
-    # We only count indicators IF the 200-day trend filter is met
-    df['Tech_Score'] = (df['Short_Trend'].astype(int) + 
-                        df['Mom_Safe'].astype(int) + 
-                        df['Vol_Conf'].astype(int)) * df['Trend_Filter'].astype(int)
+    # 4. MACD CONFIRMATION: Bullish trajectory
+    macd_line, sig_line = calculate_macd(df['Close'])
+    df['MACD_Bull'] = macd_line > sig_line
     
-    # Calculate Forward Returns
+    # Calculate the balanced Tech Score (Simple Addition restores the 0-4 scale)
+    df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
+    
+    # Calculate Forward Returns (Look 5 days into the future)
     df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
     df = df.dropna() 
     
@@ -156,6 +153,18 @@ def run_backtest(ticker):
         Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean() * 100),
         Avg_Return_5D=('Return_5D', lambda x: x.mean() * 100)
     ).round(2)
+    
+    # Apply Human-Friendly Names to the Tiers
+    score_labels = {
+        0: "0/4 - 🔴 Deep Bear / Distribution",
+        1: "1/4 - 🟠 Weak / Choppy",
+        2: "2/4 - 🟡 Neutral / Transitioning",
+        3: "3/4 - 🟢 Solid Bullish Momentum",
+        4: "4/4 - 🔥 Perfect A+ Setup"
+    }
+    
+    # Map the numeric index to the vivid names
+    stats.index = stats.index.map(lambda x: score_labels.get(x, str(x)))
     
     return stats
 
@@ -377,8 +386,8 @@ elif mode == "Backtest Engine":
             stats = run_backtest(test_ticker)
             
             if stats is not None and not stats.empty:
-                st.markdown(f"### 📊 Tech Score Performance for {test_ticker}")
-                st.write("This table tracks exactly what happened to the stock 5 days and 10 days AFTER it registered a specific Tech Score.")
+                st.markdown(f"### 📊 Institutional Performance Matrix for {test_ticker}")
+                st.write("This table tracks exactly what happened to the stock 5 days AFTER it registered a specific Market Phase.")
                 
                 # Format the dataframe into a beautiful heat-mapped table
                 st.dataframe(
@@ -387,9 +396,11 @@ elif mode == "Backtest Engine":
                     use_container_width=True
                 )
                 
-                # Extract the 4/4 win rate for a dynamic insight
-                if 4 in stats.index:
-                    win_5 = stats.loc[4, 'Win_Rate_5D']
-                    st.success(f"**Institutional Insight:** When {test_ticker} hits a perfect 4/4 Tech Score, historical data shows it has a **{win_5}% probability** of being profitable 5 days later.")
+                # Dynamic Institutional Insight that reads the new string labels
+                target_label = "4/4 - 🔥 Perfect A+ Setup"
+                if target_label in stats.index:
+                    win_5 = stats.loc[target_label, 'Win_Rate_5D']
+                    occurrences = stats.loc[target_label, 'Occurrences']
+                    st.success(f"**🎯 Institutional Insight:** Over the last 2 years, {test_ticker} hit a **Perfect A+ Setup** {occurrences} times. Buying these setups yielded a **{win_5}% probability** of profit 5 days later.")
             else:
                 st.error("Not enough data to run backtest.")
