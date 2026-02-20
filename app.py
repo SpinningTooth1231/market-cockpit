@@ -120,41 +120,50 @@ def get_intraday_data(ticker):
         }
     except: return None
 
-def run_backtest(ticker):
+def run_backtest(ticker, sma_window, rsi_lower, rsi_upper):
     stock = yf.Ticker(ticker)
     df = stock.history(period="2y") 
     if df.empty: return None
 
-    # 1. TREND: Price is respecting the 20-day moving average
-    df['SMA_20'] = df['Close'].rolling(window=20).mean()
-    df['Trend'] = df['Close'] > df['SMA_20']
+    # 1. DYNAMIC TREND
+    df['SMA'] = df['Close'].rolling(window=sma_window).mean()
+    df['Trend'] = df['Close'] > df['SMA']
     
-    # 2. MOMENTUM: Strong but not overbought (RSI between 50 and 70)
+    # 2. DYNAMIC MOMENTUM
     df['RSI'] = calculate_rsi(df['Close'])
-    df['Mom'] = (df['RSI'] > 50) & (df['RSI'] < 70)
+    df['Mom'] = (df['RSI'] > rsi_lower) & (df['RSI'] < rsi_upper)
     
-    # 3. VOLUME: Above average volume today or yesterday
+    # 3. VOLUME
     df['Vol_SMA'] = df['Volume'].rolling(window=20).mean()
     df['Vol'] = (df['Volume'] > df['Vol_SMA']) | (df['Volume'].shift(1) > df['Vol_SMA'].shift(1))
     
-    # 4. MACD CONFIRMATION: Bullish trajectory
+    # 4. MACD
     macd_line, sig_line = calculate_macd(df['Close'])
     df['MACD_Bull'] = macd_line > sig_line
     
-    # Calculate the balanced Tech Score (Simple Addition restores the 0-4 scale)
+    # Calculate Score
     df['Tech_Score'] = df['Trend'].astype(int) + df['Mom'].astype(int) + df['Vol'].astype(int) + df['MACD_Bull'].astype(int)
     
-    # Calculate Forward Returns (Look 5 days into the future)
+    # Forward Returns (5 Days)
     df['Return_5D'] = df['Close'].shift(-5) / df['Close'] - 1
     df = df.dropna() 
     
+    # Calculate Professional Trade Expectancy
     stats = df.groupby('Tech_Score').agg(
         Occurrences=('Close', 'count'),
-        Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean() * 100),
-        Avg_Return_5D=('Return_5D', lambda x: x.mean() * 100)
-    ).round(2)
+        Win_Rate_5D=('Return_5D', lambda x: (x > 0).mean()),
+        Avg_Win=('Return_5D', lambda x: x[x > 0].mean() if len(x[x > 0]) > 0 else 0),
+        Avg_Loss=('Return_5D', lambda x: x[x <= 0].mean() if len(x[x <= 0]) > 0 else 0)
+    )
     
-    # Apply Human-Friendly Names to the Tiers
+    # Expectancy Formula: (Win Rate * Avg Win) + (Loss Rate * Avg Loss)
+    stats['Expectancy'] = (stats['Win_Rate_5D'] * stats['Avg_Win']) + ((1 - stats['Win_Rate_5D']) * stats['Avg_Loss'])
+    
+    # Format percentages for the UI
+    stats['Win_Rate_5D'] = stats['Win_Rate_5D'] * 100
+    stats['Expectancy'] = stats['Expectancy'] * 100
+    stats = stats[['Occurrences', 'Win_Rate_5D', 'Expectancy']].round(2)
+    
     score_labels = {
         0: "0/4 - 🔴 Deep Bear / Distribution",
         1: "1/4 - 🟠 Weak / Choppy",
@@ -162,8 +171,6 @@ def run_backtest(ticker):
         3: "3/4 - 🟢 Solid Bullish Momentum",
         4: "4/4 - 🔥 Perfect A+ Setup"
     }
-    
-    # Map the numeric index to the vivid names
     stats.index = stats.index.map(lambda x: score_labels.get(x, str(x)))
     
     return stats
