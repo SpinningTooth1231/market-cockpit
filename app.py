@@ -30,12 +30,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- CONFIGURATION ---
-# Fetch the key securely from Streamlit Secrets
 try:
     GOOG_API_KEY = st.secrets["GOOG_API_KEY"]
     genai.configure(api_key=GOOG_API_KEY)
 except Exception as e:
-    st.error(f"API Key Error: Please check your Streamlit Secrets.")
+    st.error("API Key Error: Please check your Streamlit Secrets.")
 
 # --- MATH ENGINE ---
 def calculate_rsi(series, period=14):
@@ -61,7 +60,8 @@ def calculate_vwap(df):
 def get_daily_data(ticker):
     try:
         stock = yf.Ticker(ticker)
-       df = stock.history(period="1mo", interval="1h")
+        # UPGRADED TO 1-HOUR CHART FOR HYPER-SENSITIVITY
+        df = stock.history(period="1mo", interval="1h")
         if df.empty: return None
 
         df['SMA_20'] = df['Close'].rolling(window=20).mean()
@@ -127,8 +127,8 @@ def get_ai_master_analysis(ticker, daily, micro):
     
     prompt = f"""
     Act as a Hedge Fund Manager. Ticker: {ticker}
-    1. MACRO (Hourly): Trend: {daily['Trend']}, Score: {daily['Score']}/4
-    2. MICRO (5m): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
+    1. MACRO (Hourly Chart): Trend: {daily['Trend']}, Score: {daily['Score']}/4
+    2. MICRO (5m Chart): VWAP Signal: {micro['VWAP_Signal']}, RSI: {micro['RSI_5m']}
     3. NEWS: {str(headlines)}
     
     YOUR TASK:
@@ -140,13 +140,12 @@ def get_ai_master_analysis(ticker, daily, micro):
     for _ in range(3):
         try:
             return model.generate_content(prompt).text
-        except Exception as e:
+        except Exception as e: 
             time.sleep(1)
-            last_error = str(e)
-    return f"⚠️ AI Connection Failed: {last_error}"
+            last_err = str(e)
+    return f"⚠️ AI Connection Failed: {last_err}"
 
 # --- UI LAYOUT ---
-# Header
 c1, c2 = st.columns([3, 1])
 with c1:
     st.title("🛸 AI Market Cockpit Pro")
@@ -154,7 +153,6 @@ with c2:
     if st.button("🔄 Refresh Data"):
         st.rerun()
 
-# Sidebar
 with st.sidebar:
     st.header("⚙️ Control Panel")
     mode = st.radio("Select Mode", ["Single Ticker", "Market Scanner"])
@@ -164,37 +162,51 @@ with st.sidebar:
 if mode == "Single Ticker":
     ticker = st.text_input("Enter Ticker", value="NVDA").upper()
     
-    # Fetch Data
     daily = get_daily_data(ticker)
     micro = get_intraday_data(ticker)
     
     if daily and micro:
-        # 1. HERO SECTION (The Big Numbers)
         st.markdown("---")
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Live Price", f"${micro['Current_Price']:.2f}")
         col2.metric("VWAP Level", f"${micro['VWAP_Price']:.2f}", delta=micro['VWAP_Signal'])
+        # UPDATED TO HOURLY TIMEFRAME
         col3.metric("Tech Score", f"{daily['Score']}/4", delta="Hourly Timeframe")
         col4.metric("5m Momentum", micro['RSI_5m'], delta=micro['RSI_Status'])
         
-        # 2. AI COMMANDER (The Decision)
         st.markdown("### 🤖 AI Commander's Verdict")
-        with st.container(): # Grouping for visual separation
+        with st.container():
             verdict = get_ai_master_analysis(ticker, daily, micro)
             st.success(verdict)
 
+        # --- NEW FEATURE: RISK MANAGEMENT ENGINE ---
+        st.markdown("### ⚖️ Auto-Calculated Risk Levels")
+        entry = micro['Current_Price']
+        r1, r2, r3 = st.columns(3)
+        
+        if "BUY" in micro['VWAP_Signal']:
+            sl = entry * 0.99
+            tp1 = entry * 1.015
+            tp2 = entry * 1.03
+            r1.metric("🛑 Stop Loss (-1%)", f"${sl:.2f}")
+            r2.metric("🎯 Take Profit 1 (+1.5%)", f"${tp1:.2f}")
+            r3.metric("🚀 Take Profit 2 (+3%)", f"${tp2:.2f}")
+        else:
+            sl = entry * 1.01
+            tp1 = entry * 0.985
+            tp2 = entry * 0.97
+            r1.metric("🛑 Short Stop (+1%)", f"${sl:.2f}")
+            r2.metric("🎯 Cover Target 1 (-1.5%)", f"${tp1:.2f}")
+            r3.metric("🚀 Cover Target 2 (-3%)", f"${tp2:.2f}")
+
         st.markdown("---")
         
-        # 3. DEEP DIVE (Dropdowns for Details)
         col_left, col_right = st.columns(2)
-        
         with col_left:
             with st.expander("📊 View Macro (Hourly) Details", expanded=False):
                 st.write(f"**Trend:** {daily['Trend']}")
                 st.write(f"**MACD:** {daily['MACD']}")
                 st.write(f"**Volume:** {daily['Vol']}")
-                
-                # FIX 1: Safely clamp RSI to prevent Streamlit limits crash
                 safe_rsi = max(0.0, min(daily['RSI_Raw'] / 100.0, 1.0))
                 st.progress(safe_rsi, text=f"RSI Strength: {daily['RSI']}")
         
@@ -225,15 +237,13 @@ elif mode == "Market Scanner":
             progress.progress((i + 1) / len(tickers))
             
             if d:
-                # Only show interesting stocks
                 if d['Score'] >= 3:
                     with st.expander(f"🔥 {t} (Score: {d['Score']}/4) - CLICK TO EXPAND"):
                         m = get_intraday_data(t)
                         c1, c2 = st.columns(2)
-                        c1.metric("Trend", d['Trend'])
+                        c1.metric("Hourly Trend", d['Trend'])
                         c2.metric("Intraday Signal", m['VWAP_Signal'])
                         
-                        # FIX 2: Added inline AI Analysis for the scanner
                         if st.button(f"🤖 Get AI Verdict for {t}", key=f"btn_{t}"):
                             with st.spinner(f"Commander analyzing {t}..."):
                                 verdict = get_ai_master_analysis(t, d, m)
@@ -241,4 +251,4 @@ elif mode == "Market Scanner":
                                 
                 elif d['Score'] <= 1:
                     with st.expander(f"🔻 {t} (Score: {d['Score']}/4) - WEAK"):
-                        st.write("Bearish Setup. Be careful.")
+                        st.write("Bearish Setup. Wait for momentum shift.")
